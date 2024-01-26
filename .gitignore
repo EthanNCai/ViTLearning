@@ -16,3 +16,6 @@ logs/
 *.swp
 *.swo
 
+
+data_miniimagenet/*
+
