@@ -18,4 +18,6 @@ logs/
 
 
 data_miniimagenet/*
+saved_model/*
+data/*
 
