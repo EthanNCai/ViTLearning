@@ -1,29 +1,26 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision.transforms import AutoAugment, transforms
-from MLclf import MLclf
+from torchvision.transforms import transforms
 from torch.optim.lr_scheduler import StepLR
 from vit_pytorch import ViT
 import time
-import re
 import random
 import os
 import numpy as np
-import sys
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 transform_train = transforms.Compose([
 
     transforms.ToTensor(),
-    transforms.Resize((224, 224)),
-    transforms.RandomHorizontalFlip(),
+    transforms.Resize((256, 256)),
     transforms.ColorJitter(),
+    transforms.RandomHorizontalFlip(),
     transforms.Normalize((0.5, 0.5, 0.5), (0.225, 0.225, 0.225))
 ])
 
 transform_val = transforms.Compose([
-    transforms.Resize((224, 224)),
+    transforms.Resize((256, 256)),
     transforms.ToTensor(),
     transforms.Normalize((0.5, 0.5, 0.5), (0.225, 0.225, 0.225))
 ])
@@ -46,21 +43,17 @@ def seed_everything(seed):
     torch.backends.cudnn.deterministic = True
 
 
-seed_everything(seed)
+from torchvision.datasets import ImageFolder
 
-MLclf.miniimagenet_download(Download=False)
+train_dataset = ImageFolder('./imagenet1k/train', transform=transform_train)
+test_dataset = ImageFolder('./imagenet1k/val', transform=transform_val)
 
-train_dataset, validation_dataset, test_dataset = MLclf.miniimagenet_clf_dataset(ratio_train=0.9, ratio_val=0.01,
-                                                                                 seed_value=None, shuffle=True,
-                                                                                 transform=transform_train,
-                                                                                 save_clf_data=True)
-
-train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=64, shuffle=True, num_workers=0)
-test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=64, shuffle=True, num_workers=0)
+train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
 
 model = ViT(
-    image_size=224,
-    patch_size=32,
+    image_size=256,
+    patch_size=16,
     num_classes=1000,
     dim=1024,
     depth=6,
@@ -73,6 +66,10 @@ model = ViT(
 model_file = None
 epochs_pretrained = 0
 
+"""
+model_parameters = torch.load('imgnet_pretrain_epoch_3_acc_20_.pth')
+model.load_state_dict(model_parameters)
+"""
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 scheduler = StepLR(optimizer, step_size=step, gamma=gamma)
@@ -104,8 +101,6 @@ def main():
         for i, (data, label) in enumerate(train_loader):
             data = data.to(device)
             label = label.to(device)
-            print(data.shape,label.shape)
-            sys.exit()
             output = model(data)
             loss = criterion(output, label)
 
@@ -120,7 +115,7 @@ def main():
             epoch_loss += loss / len(train_loader)
 
             print(
-                f"Epoch:{epoch}/{epochs} Step : {i}/{len(train_loader)} - step_loss : {loss.item():.4f}"
+                f"\rEpoch:{epoch}/{epochs} Step : {i}/{len(train_loader)} - step_loss : {loss.item():.4f}", end=''
             )
 
         scheduler.step()
@@ -146,7 +141,7 @@ def main():
         epoch_time = end_time - start_time
 
         print(
-            f"Epoch : {epoch + 1} - loss : {epoch_loss:.4f} - acc: {epoch_accuracy:.4f} - val_loss : "
+            f"\nEpoch : {epoch + 1} - loss : {epoch_loss:.4f} - acc: {epoch_accuracy:.4f} - val_loss : "
             f"{epoch_val_loss:.4f} - val_acc: {epoch_val_accuracy:.4f} - Time: {epoch_time:.2f} seconds"
         )
         print(
