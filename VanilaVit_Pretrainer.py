@@ -148,7 +148,7 @@ def main():
             f"Top-1 Accuracy: {top1_val_accuracy / len(test_loader):.4f} - Top-5 Accuracy: {top5_val_accuracy / len(test_loader):.4f}"
         )
 
-        # 保存模型
+        # 保存模型awd
         torch.save(model.state_dict(), f"imgnet_pretrain_epoch_{epoch + 1}_acc_{int(epoch_val_accuracy * 100)}_.pth")
 
 
