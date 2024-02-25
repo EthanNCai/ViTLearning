@@ -8,6 +8,7 @@ import time
 import random
 import os
 import numpy as np
+import torchvision
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 transform_train = transforms.Compose([
@@ -43,18 +44,20 @@ def seed_everything(seed):
     torch.backends.cudnn.deterministic = True
 
 
-from torchvision.datasets import ImageFolder
+train_set = torchvision.datasets.CIFAR10(root='./data', train=True,
+                                         download=False, transform=transform_train)
+train_loader = torch.utils.data.DataLoader(train_set, batch_size=batch_size,
+                                           shuffle=True, num_workers=2)
 
-train_dataset = ImageFolder('./imagenet1k/train', transform=transform_train)
-test_dataset = ImageFolder('./imagenet1k/val', transform=transform_val)
-
-train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
-test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+test_set = torchvision.datasets.CIFAR10(root='./data', train=False,
+                                        download=False, transform=transform_val)
+test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size,
+                                          shuffle=False, num_workers=2)
 
 model = ViT(
     image_size=256,
     patch_size=16,
-    num_classes=1000,
+    num_classes=10,
     dim=1024,
     depth=6,
     heads=16,
@@ -67,9 +70,17 @@ model_file = None
 epochs_pretrained = 0
 
 """
-model_parameters = torch.load('imgnet_pretrain_epoch_3_acc_20_.pth')
-model.load_state_dict(model_parameters)
+load from pretrain
 """
+pre_weights = torch.load('./saved_model/imgnet_pretrain_epoch_11_acc_36_.pth')
+pre_dict = {k: v for k, v in pre_weights.items() if model.state_dict()[k].numel() == v.numel()}
+missing_keys, unexpected_keys = model.load_state_dict(pre_dict, strict=False)
+"""
+freeze pretrained weight
+"""
+# for param in model.features.parameters():
+#    param.requires_grad = False
+
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 scheduler = StepLR(optimizer, step_size=step, gamma=gamma)
@@ -149,7 +160,7 @@ def main():
         )
 
         # 保存模型awd
-        torch.save(model.state_dict(), f"imgnet_pretrain_epoch_{epoch + 1}_acc_{int(epoch_val_accuracy * 100)}_.pth")
+        torch.save(model.state_dict(), f"./saved_model/cifar10_fine_tune_epoch_{epoch + 1}_acc_{int(epoch_val_accuracy * 100)}_.pth")
 
 
 if __name__ == '__main__':
